@@ -1,24 +1,25 @@
-import { Injectable } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
-
-export type User = {
-  id: number;
-  name: string;
-  email: string;
-};
+import { Injectable, ConflictException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { User, UserDocument } from './schema/user.schema';
+import { CreateUserInput } from './validators/create-user.zod';
 
 @Injectable()
 export class UsersService {
-  private users: User[] = [];
-  private idCounter = 1;
+  constructor(
+    @InjectModel(User.name)
+    private userModel: Model<UserDocument>,
+  ) {}
 
-  findAll(): User[] {
-    return this.users;
-  }
-
-  create(dto: CreateUserDto): User {
-    const user: User = { id: this.idCounter++, name: dto.name, email: dto.email };
-    this.users.push(user);
-    return user;
+  async create(data: CreateUserInput) {
+    try {
+      const user = new this.userModel(data);
+      return await user.save();
+    } catch (error) {
+      if (error.code === 11000) {
+        throw new ConflictException('Email already exists');
+      }
+      throw error;
+    }
   }
 }
